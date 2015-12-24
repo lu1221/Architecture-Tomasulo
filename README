@@ -1,137 +1,22 @@
-OVERVIEW:
+==========
 
-This README file is for the SimpleScalar simulator release 3.0.  This release
-is available from:
+The following gives a brief description of our underlying design principle.
 
-	http://www.simplescalar.com
+==========
 
-in the file simplesim-3v0d.tar.gz.
+The run_Tomasolu( .. ) function loops through calling CDB, execute, issue, and dispatch each cycle, until simulation is complete. Please refer to comments in tomasolu.c for further explanation.
 
-
-TO INSTALL:
-
-The following details how to build and install the SimpleScalar simulators:
-
-	a) vi Makefile
-
-	Make sure all compile options are set for your host, we've listed
-	the options for the OS/compiler combinations that were tested,
-	uncomment one of these if appropriate.  You'll likely not have to
-	change anything for the supported hosts, and if you need to change
-	anything, it will likely be the CC variable (which specifies
-	the ANSI C compiler to use to build the simulators).  NOTE: the
-	simulators must be built with an ANSI-C compatible compiler, if you
-	have problems with your compiler, try using GNU GCC as it is known
-	to build the simulators on all the supported platforms.
-
-	b) make config-pisa			(to build SimpleScalar/PISA)
-	   or
-	   make config-alpha			(to build SimpleScalar/Alpha)
-
-	Execute one of the above commands to configure the SimpleScalar
-	build.  The SimpleScalar/PISA build executes SimpleScalar PISA
-	(Portable ISA) binaries (the old "SimpleScalar ISA"), and the
-	SimpleScalar/Alpha build executes statically linked Alpha OSF
-	binaries.  If building with Cygwin/32 (www.cygwin.com) on Windows,
-        be sure to unpack with "tar" to set up the symbolic links.
-
-	c) make
-
-	This builds the simplescalar simulators.
-
-	d) make sim-tests
-
-	This tests the simulators, this step will take anywhere from ~5 min
-	to an hour, depending on the performance of your host.  Inspect the
-	output of this command, when the script diff's the outputs of the
-	simulators against the known good outputs, there should be no
-	differences.
-
-	e) vi pipeview.pl textprof.pl
-
-	Configure these two perl scripts by placing the location of your
-	perl executable on the first line of each script.
-
-
-BUILDING BINARIES FOR SIMPLESCALAR
-
-SimpleScalar/PISA binaries must be built using the SimpleScalar GNU tool
-chain (e.g., GCC, GAS, GLD), available from:
-
-    http://www.cs.wisc.edu/~mscalar/simplescalar.html
-
-Prebuilt SimpleScalar PISA (Portable ISA) binaries, for big- and
-little-endian hosts, are also available from that site.
-
-SimpleScalar/Alpha binaries must be built on Digitial Alpha OSF Unix (or
-with a suitable cross compiler).  Any Alpha OSF Unix compiler should
-work, however, the binaries must be statically linked.  To statically
-link a binary, add the "-static" flag to the link line of GNU GCC, or add
-"-non_shared" to the link line of the DEC compilers.  NOTE: if you get
-a "dnet_conn not found" error when linking Alpha OSF binaries, add
-"-ldnet_stub" to your link line.
-
-
-IS SIMPLESCALAR FREE?
-
-No, but academic users (e.g., users at education institutions, U.S.
-government research labs, and non-profit research institutes) may use
-SimpleScalar tools free-of-charge for non-commercial research and
-instruction. Support is provided to non-commercial users as resources
-permit. Any use of SimpleScalar software, in binary or source form,
-in a commercial setting or application (e.g., use within a for-profit
-business, use to generate intellectual property for patents, or use
-to implement a consulting contract) for any reason, purpose or goal
-is commercial use of SimpleScalar software and thus requires a
-commercial use license from SimpleScalar LLC.  Contact SimpleScalar
-LLC at info@simplescalar.com for commercial licensing details.
-
-
-PUBLISHING PAPERS WITH SIMPLESCALAR
-
-When publishing a paper with SimpleScalar results, please refer to the
-specific target you use as "SimpleScalar/PISA" or "SimpleScalar/Alpha".
-In addition, please make reference to the latest SimpleScalar report,
-this reference is available from:
-
-    http://www.simplescalar.com
-
-Above all, please use good judgement when doing research with the
-SimpleScalar tool set.  Before publishing any numbers you should validate
-your results.  Use the pipetrace facility, combined with microbenchmarks,
-to test our code, your code, and your intuitions.  If the simulators are
-not appropriate for your experiments, build a new simulator or use
-another more appropriate simulation tool set.  The SimpleScalar tool set
-is not appropriate for all computer architecture research, and it's
-certainly not any substitute for good science.
-
-
-USING SIMPLESCALAR FOR INSTRUCTION
-
-Many instructors have found the SimpleScalar tools useful in their
-courses.  To make this process as painless as possible, we've made
-available an instructors kit that includes pre-built binaries with
-small-ish inputs.  Also included are directions on how to build and
-run the experiments, suggested projects at all levels, and slides
-that the instructor can use to introduce students to the Simplescalar
-tool set.  The instructions kit is available from http://www.simplescalar.com.
-
-
-FOR MORE INFORMATION:
-
-For general documentation on the tool set, see the hacker's guide in the
-file "hack_guide.{pfd,ps,ppt}".  Frequently asked questions are answered
-in the FAQ file.  And suggested projects are listed in the file PROJECTS.
-The simulators (the sim-* executables) are self-documenting, just run
-them with the "-h" flag.
-
-To get plugged into the SimpleScalar scene, visit the SimpleScalar web
-site (www.simplescalar.com).  And please send us your comments regarding
-this tool set, we are continually trying to improve it and we appreciate
-your input.
-
-Best Regards,
-
-Todd Austin
-SimpleScalar LLC
-info@simplescalar.com
+Dispatch The dispatch stage includes both instruction fetch and dispatch. It is implementated in function fetch_To_dispatch( .. ).
+Fetch: In this stage we used get_instr( .. ) to fetch one instruction into an  instruction fetch queue of size 10 to store for each clock cycle. We used our helper function ifq_not_ful( .. ) to determine the status of the fetch queue: 1. The fetched instruction is NULL we simply return as it signified the end of the trace execution. 2. If the fetched instruction is a TRAP instruction we skip it and fetch the next instruction in the same cycle. 3. In case the fetch queue is full we just fetch nothing and simply return 4. In case the fetch queue is not full we fetch one instruction and put it to the end of the queue. At the same time we initiatialize instruction attributes including Q[i]s and tom_*_cycles. We also increment the instruction queue size by one.
+Dispatch: We attempted to get the instruction from the head of the IFQ and dispatch into the corresponding reservation stations depending on the instruction if it is an integer or floating-point computation . We used our helper function rs_not_full( .. ) to determine whether or not the reservation station is full. 1. If the fetched instruction is a conditional or unconditional control instruction i.e. a branch in this case we poped this instruction off the queue and shift the queue using our helper function shift_ifq(void).
+2. In case the reservation station is full we simply return i.e. this is essentially a stall due to structural hazard. 3. In case the reservation station is not full we located the free reservation station indicated by rs_not_full( .. ) and placed the instruction into the slot. 4. We then check RAW hazards by checking the entries of the map table to see if it corresponds to the source registers used in the current instruction. If we do find such an entry, then we know that there is a RAW hazard dependency. And we link the instruction that produces the result needed by the source register in the current instruction to the source register of the current instruction  i.e. curr_instr->Q[ .. ] = map_table[ curr_instr->r_in[i] ]. We then updated the map table to link the current instruction's output register(s) to the reservation station where it resides. Finally we update the dispatch cycle, tom_dispatch_cycle associated with the current instruction and shift the IFQ. 
+Issue The issue stage is implemented by the function dispatch_To_issue( .. ). In this stage we search for any empty slots in the functional units. 1. In case we do not find an empty slot we just return. i.e. this symbolizes a stall due to structural hazard. 2. In case we find an empty slot we scan through the reservation station and get the oldest instruction without RAW hazard dependency that has not yet been issued. We then put this instruction into the corresponding idle function unit indicated by our helper function fu_not_busy( .. ). We repeat this process untill the functional unis are full or all the instructions in the reservation station have RAW hazard dependencies. At last we update the issue cycle, tom_issue_cycle associated with the current instruction i.e. the instruction just got issued into the function units. And this current instruction will execute in the next clock cycle.
+Execute The execute stage is implemented by the function execute_To_CDB( .. ) which includes the functionalites of issue_To_execute( .. ). In this stage we first scan through the function units to execute newly issued instructions i.e. set the  tom_execute_cycle attribute of the instruction in the function unit to the current cycle if it was 0. Then we check if any of the finished executing instructions do not write to the CDB i.e.  !WRITES_CDB( .. ) and clear the reservation station entry of such functions, as well as its functional unit entry. Then, for other completed instructions, we find the oldest one, and push it to the CDB, and clear its reservation station, its functional unit entries and the its map table entries. 
+* Special Case 1 * There are no WAR and WAW hazards in this case because the source registers of the instructions in the reservation stations keep the link to the older instructions in the reservation that generates the result(s) needed by its source register(s). This is equivalent to keeping a local copy of register value in the reservation station.
+* Special Case 2 * If the map table entry of the instruction gets overwritten or cleared we simply do nothing since we have already saved the link to the dependent instructions in the reservation station. This will allow CDB broadcast through the Q[ .. ] fields of the instructions in the reservation station.
+CDB / Writeback
+The CDB / Writeback stage is implemented by the function CDB_To_retire( .. ). In this stage we determine if the CDB is empty. 1. In case it is empty we simply return. No instructions have been compeleted at the current cycle. 2. In case it has an instruction we first update the CDB cycle, tom_cdb_cycle and scan through the Q[ .. ] fields of each instruction in the reservation station. And we removed the link between the instruction in CDB that generates the result and the instruction in the reservation that requires the result. This is equivalent to the broadcast mechanism in Tomasulo. At last we clear the CDB to prevent further broadcasting the same instruction.
+Simulation Termination The completion stage of the tomasolu simulation is implemented in the is_simulation_done function. This function checks if all the reservation stations and the common data bus are empty. If all of those are empty, then we can safely terminate the simulation. Otherwise there are still instructions that are busy executing or broadcasting. 
+Testing Methodology We created several debug functions to print out information about the contents of the reservation stations, instruction fetch queues, map tables, functional units, and CDB for any given clock cycle:
+static void DBG_viewCycleTable(instruction_trace_t* trace, int lastcycle); static void DBG_viewCycle(int cycle); static void DBG_viewIFQ_FUstatus(void); static void DBG_viewRS(void); static void DBG_viewMapTable_CDB(void);
+These helped us verify that instructions were correctly being sent from one stage to the next, and allowed us to examine the status of the reservation stations, IFQ, map table, functional units and CDB at each stage. To verify the proper scheduling of floating point instructions, we ran the compress.eio trace and checked the floating instructions in the trace, starting at the 10913th instruction. To enable these debug messages uncomment the #define DBG_VIEW at line 112 of tomasolu.c. We also used gdb debugger tool to quickly track down and fix the segmentation faults encountered. Please refer to the comments at the end of tomasulo.c file for verification of correctness. 
